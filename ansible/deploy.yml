@@ -1,0 +1,15 @@
+- hosts: all:localhost
+  gather_facts: no
+  vars:
+    port: 5000
+  tasks:
+    # XXX needs to be privileged to docker
+    - name: deploy tailog instance
+      docker_container:
+        image: jbieron/tailog
+        command: -p {{port}}
+        state: started
+        network_mode: host
+        name: tailog
+        volumes:
+          - /var/log:/var/log:ro
