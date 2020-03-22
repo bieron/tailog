@@ -97,6 +97,28 @@ def test_match(client):
     assert lines == reversed_expects[:limit]
 
 
+def test_border_cases(client):
+
+    def _mkfile(path):
+        with open(f'{APP_LOG_DIR}/{filename}', 'w') as f:
+            pass
+
+    filename = 'forbidden'
+    _mkfile(filename)
+    os.chmod(f'{APP_LOG_DIR}/{filename}', 0o000)
+    r = client.get(f'/rest/files/{filename}')
+    assert r.status_code == 403
+    assert r.get_json()['error'].startswith(
+        'You do not have permissions to read')
+
+    filename = 'empty'
+    _mkfile(filename)
+    r = client.get(f'/rest/files/{filename}')
+    assert r.status_code == 200
+    assert not len(r.get_json()['objects'])
+
+
+
 def test_jailbreak(client):
     r = client.get(f'/rest/files/../../etc/passwd')
     assert r.status_code == 403
@@ -106,5 +128,4 @@ def test_jailbreak(client):
 
     r = client.get(f'/rest/files/~/.bashrc')
     assert r.status_code == 404
-    error = r.get_json()
-    assert 'does not exist' in error['error']
+    assert 'does not exist' in r.get_json()['error']
