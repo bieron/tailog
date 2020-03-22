@@ -1,0 +1,11 @@
+#!/bin/sh
+
+if [ `dirname $0` != . ]; then
+    cd $(dirname $(realpath $0))
+fi
+
+port=${1:-5000}
+log_dir=${2:-/var/log}
+name=${3:-tailog}
+
+docker run --rm --network host -v $log_dir:/var/log:ro jbieron/tailog -p $port
