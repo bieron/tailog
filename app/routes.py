@@ -1,13 +1,31 @@
 from app import app, logfile
 from flask import request, redirect
 from logging import getLogger
+from urllib.parse import urlencode
+from concurrent.futures import as_completed
+from requests_futures.sessions import FuturesSession
 
-from app.util import error_response, validate_input, boolean, for_presentation
+from app.util import (error_response, validate_input, boolean, for_presentation,
+    address_list)
 
 log = getLogger(__name__)
 
 DEFAULT_LINES_COUNT = 10
 OUTPUT_FORMATS = ('json', 'text')
+
+def gather_delegated(hosts, path, args):
+    if not args['match']:
+        args.pop('match')
+    qs = urlencode(args)
+
+    data = {}
+
+    with FuturesSession() as s:
+        future_map = {s.get(f'{h}/rest/files/{path}?{qs}') : h for h in hosts}
+        for fut in as_completed(future_map.keys()):
+            data[ future_map[fut] ] = fut.result().json()
+
+    return data
 
 
 def list_response(objects, trim=False):
@@ -50,10 +68,14 @@ def file(path):
             n={'default': DEFAULT_LINES_COUNT, 'type': int},
             match={'default': None, 'type': str},
             trim={'default': True, 'type': boolean},
+            delegate={'default': None, 'type': address_list}
         )
     except ValueError as e:
         return error_response(e, 400)
 
+    if args['delegate']:
+        delegate = args.pop('delegate')
+        return gather_delegated(delegate, path, args)
 
     try:
         path = logfile.abspath(path)

@@ -12,6 +12,16 @@ def for_presentation(path, base):
 def boolean(v):
     return v.lower() not in ('false', 'f', 'no', 'n', '0')
 
+class InvalidParam(ValueError): pass
+
+def address_list(v):
+    if not v:
+        raise InvalidParam('list cannot be empty')
+    addresses = v.split(',')
+    if any(not a for a in addresses):
+        raise InvalidParam('addresses cannot be empty')
+    return addresses
+
 
 def validate_input(args, **schema):
     params = {}
@@ -27,6 +37,8 @@ def validate_input(args, **schema):
 
         try:
             val = call(val)
+        except InvalidParam as e:
+            raise ValueError(f"'{key}' param invalid: {e}")
         except ValueError:
             raise ValueError(
                 f"'{key}' param expects {call.__name__}, not '{val}'"

@@ -26,6 +26,16 @@ def test_api(client):
     assert r.status_code == 404, r.data
     assert 'does not exist' in r.get_json()['error']
 
+    r = client.get('/rest/files/404?delegate=')
+    assert r.status_code == 400, r.data
+    error = r.get_json()['error']
+    assert "'delegate' param invalid: list cannot be empty" in error
+
+    r = client.get('/rest/files/404?delegate=foo,,bar')
+    assert r.status_code == 400, r.data
+    error = r.get_json()['error']
+    assert "'delegate' param invalid: addresses cannot be empty" in error
+
 
 def test_rest(client):
     r = client.get('/rest/files/')

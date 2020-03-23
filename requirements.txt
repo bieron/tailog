@@ -1,2 +1,3 @@
-flask
-python-magic
+flask == 1.1.1
+python-magic == 0.4.15
+requests_futures == 1.0.0
