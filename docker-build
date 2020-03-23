@@ -4,4 +4,4 @@ if [ `dirname $0` != . ]; then
     cd $(dirname $(realpath $0))
 fi
 
-docker build . -t jbieron/tailog
+docker build . -t jbieron/tailog:0.1
