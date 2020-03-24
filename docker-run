@@ -7,5 +7,11 @@ fi
 port=${1:-5000}
 log_dir=${2:-/var/log}
 
-docker run --rm --network host -v $log_dir:/var/log:ro \
-    jbieron/tailog:0.1 -p $port
+cont=`docker run --rm -d -v $log_dir:/var/log:ro \
+    jbieron/tailog:0.1 -h 0.0.0.0 -p $port`
+
+ip=$(docker inspect $cont -f {{.NetworkSettings.IPAddress}})
+echo
+echo Server will be visible on http://$ip:$port
+echo
+docker attach $cont

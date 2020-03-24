@@ -1,17 +1,22 @@
-from app import app, logfile
 from flask import request, redirect
 from logging import getLogger
 from urllib.parse import urlencode
 from concurrent.futures import as_completed
 from requests_futures.sessions import FuturesSession
 
+from app import app, logfile
 from app.util import (error_response, validate_input, boolean, for_presentation,
     address_list)
 
 log = getLogger(__name__)
 
 DEFAULT_LINES_COUNT = 10
+#TODO add XML, HTML
 OUTPUT_FORMATS = ('json', 'text')
+
+FORMAT_DEF = {
+    'type': str, 'default': OUTPUT_FORMATS[0], 'values': OUTPUT_FORMATS,
+}
 
 def gather_delegated(hosts, path, args):
     if not args['match']:
@@ -28,36 +33,25 @@ def gather_delegated(hosts, path, args):
     return data
 
 
-def list_response(objects, trim=False):
-    try:
-        args = validate_input(
-            request.args, format={
-                'type': str,
-                'default': OUTPUT_FORMATS[0],
-                'values': OUTPUT_FORMATS,
-            },
-        )
-    except ValueError as e:
-        return error_response(e, 400)
-
-    if args['format'] == 'text':
-        return ''.join(objects)
-    #TODO add XML
-    if trim:
-        objects = [o.strip('\n') for o in objects]
-    return {'objects': objects}
-
-
 @app.route('/')
 def index():
     return redirect('/rest/files/')
 
 @app.route('/rest/files/')
 def files():
+    try:
+        args = validate_input(request.args, format=FORMAT_DEF)
+    except ValueError as e:
+        return error_response(e, 400)
+
     base_url = request.base_url
-    return list_response(
-        [for_presentation(f, base_url) for f in logfile.get_all()]
-    )
+
+    files = logfile.get_all()
+
+    if args['format'] == 'text':
+        return '\n'.join(files)
+
+    return {'objects': [for_presentation(f, base_url) for f in files]}
 
 
 @app.route('/rest/files/<path:path>')
@@ -68,7 +62,8 @@ def file(path):
             n={'default': DEFAULT_LINES_COUNT, 'type': int},
             match={'default': None, 'type': str},
             trim={'default': True, 'type': boolean},
-            delegate={'default': None, 'type': address_list}
+            delegate={'default': None, 'type': address_list},
+            format=FORMAT_DEF,
         )
     except ValueError as e:
         return error_response(e, 400)
@@ -90,6 +85,17 @@ def file(path):
         return error_response(
             f"You do not have permissions to read '{path}'", 403
         )
+    except UnicodeError:
+        return error_response(
+            f"'{path}' is unreadable, probably binary", 406
+        )
+
 
     lines.reverse()
-    return list_response(lines, args['trim'])
+    if args['format'] == 'text':
+        return ''.join(lines)
+
+    if args['trim']:
+        lines = [l.strip('\n') for l in lines]
+
+    return {'objects': lines}

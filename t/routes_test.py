@@ -1,6 +1,6 @@
 import os
 from string import ascii_letters
-from random import randint, choices
+from app.routes import OUTPUT_FORMATS
 
 APP_LOG_DIR = os.environ['LOG_DIR']
 
@@ -20,7 +20,7 @@ def test_api(client):
     r = client.get('/rest/files/400?format=bad')
     assert r.status_code == 400, r.data
     assert r.get_json()['error'] == \
-            "'format' must be one of ('json', 'text'), not 'bad'"
+            f"'format' must be one of {OUTPUT_FORMATS}, not 'bad'"
 
     r = client.get('/rest/files/404')
     assert r.status_code == 404, r.data
@@ -35,6 +35,13 @@ def test_api(client):
     assert r.status_code == 400, r.data
     error = r.get_json()['error']
     assert "'delegate' param invalid: addresses cannot be empty" in error
+
+    for fmt in OUTPUT_FORMATS:
+        r = client.get(f'/rest/files/?format={fmt}')
+        assert r.status_code == 200, r.data
+        r = client.get(f'/rest/files/400?format={fmt}')
+        assert r.status_code == 200, r.data
+
 
 
 def test_rest(client):
@@ -70,10 +77,10 @@ def test_rest(client):
 
     limit = 1
 
-    r = client.get(f'{url}?n={limit}')
+    r = client.get(f'{url}?n={limit}&trim=0')
     lines = r.get_json()['objects']
     assert len(lines) == limit
-    assert lines[0] == reversed_expects[0]
+    assert lines[0] == reversed_expects[0] + '\n'
 
 
 def test_match(client):
@@ -110,7 +117,7 @@ def test_match(client):
 def test_border_cases(client):
 
     def _mkfile(path):
-        with open(f'{APP_LOG_DIR}/{filename}', 'w') as f:
+        with open(f'{APP_LOG_DIR}/{path}', 'w'):
             pass
 
     filename = 'forbidden'
@@ -125,8 +132,7 @@ def test_border_cases(client):
     _mkfile(filename)
     r = client.get(f'/rest/files/{filename}')
     assert r.status_code == 200
-    assert not len(r.get_json()['objects'])
-
+    assert r.get_json()['objects'] == []
 
 
 def test_jailbreak(client):
@@ -139,3 +145,35 @@ def test_jailbreak(client):
     r = client.get(f'/rest/files/~/.bashrc')
     assert r.status_code == 404
     assert 'does not exist' in r.get_json()['error']
+
+
+def test_bad_file(client):
+    filename = 'binary'
+    with open(f'{APP_LOG_DIR}/{filename}', 'wb') as f:
+        f.write(b'\x00\xaf')
+
+    r = client.get(f'/rest/files/{filename}')
+    assert r.status_code == 406
+    expected = f"'{APP_LOG_DIR}/{filename}' is unreadable, probably binary"
+    assert r.get_json()['error'] == expected
+
+
+def test_dir_recurse(client):
+    os.mkdir(os.path.join(APP_LOG_DIR, 'dir'))
+    path = 'dir/file'
+    expects = ['anything']
+    _write_expects(expects, path)
+    r = client.get(f'/rest/files/')
+    assert r.status_code == 200
+    files = r.get_json()['objects']
+    assert files
+    for f in files:
+        if f['path'] == path:
+            url = f['url']
+            break
+    else:
+        assert False, f"'{path}' not found in {files}"
+
+    r = client.get(url)
+    assert r.status_code == 200
+    assert r.get_json()['objects'] == expects

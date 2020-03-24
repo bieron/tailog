@@ -18,7 +18,7 @@ def __get_log_dir():
 
 LOG_DIR = __get_log_dir()
 OFFSET = len(LOG_DIR) + 1
-GLOB = f'{LOG_DIR}/*'
+GLOB = f'{LOG_DIR}/**'
 
 log = getLogger(__name__)
 
@@ -42,7 +42,7 @@ def get_all():
                 paths.append(f[OFFSET:])
         except PermissionError:
             log.warning('Skipping denied file %s', f)
-    return paths
+    return sorted(paths)
 
 
 def tail(path, count=10, match=None):

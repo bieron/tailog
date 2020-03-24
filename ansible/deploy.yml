@@ -6,7 +6,7 @@
     # XXX needs to be privileged to docker
     - name: deploy tailog instance
       docker_container:
-        image: jbieron/tailog
+        image: jbieron/tailog:0.1
         command: -p {{port}}
         state: started
         network_mode: host
